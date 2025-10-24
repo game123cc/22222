@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Регистрация / Вход</title>
+  <style>
+    body {
+      background-color: #2f4f4f;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    .container {
+      background-color: #2b2b2b;
+      padding: 40px;
+      border-radius: 15px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.4);
+      width: 300px;
+      text-align: center;
+    }
+
+    h2 {
+      color: white;
+      margin-bottom: 20px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: none;
+      border-radius: 8px;
+      background-color: #1e1e1e;
+      color: white;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    .password-container {
+      position: relative;
+    }
+
+    .password-container img {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    button {
+      background-color: #111;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background-color: #333;
+    }
+
+    a {
+      color: white;
+      text-decoration: underline;
+      font-size: 14px;
+    }
+
+    a:hover {
+      color: #ccc;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 id="title">РЕГИСТРАЦИЯ</h2>
+    <input type="text" placeholder="name..." id="name" />
+    <div class="password-container">
+      <input type="password" placeholder="password..." id="password" />
+      <img src="icons/eye.png" id="togglePassword">
+    </div>
+    <div class="password-container" id="confirmContainer">
+      <input type="password" placeholder="confirm password..." id="confirm" />
+      <img src="icons/eye-slash.png" id="toggleConfirm">
+    </div>
+    <button onclick="handleAction()">Готово </button>
+    <p style="margin-top: 10px; color:white;">
+      Уже есть аккаунт? <a href="#" id="switchMode">Войдите</a>
+    </p>
+  </div>
+
+  <script src="storage.js"></script>
+  <script>
+    let isRegisterMode = true;
+
+    const togglePassword = document.getElementById("togglePassword");
+    const password = document.getElementById("password");
+    togglePassword.addEventListener("click", () => {
+      const type = password.type === "password" ? "text" : "password";
+      password.type = type;
+      togglePassword.src = type === "password" ? "icons/eye.png" : "icons/eye-slash.png";
+    });
+
+    const toggleConfirm = document.getElementById("toggleConfirm");
+    const confirm = document.getElementById("confirm");
+    toggleConfirm.addEventListener("click", () => {
+      const type = confirm.type === "password" ? "text" : "password";
+      confirm.type = type;
+      toggleConfirm.src = type === "password" ? "icons/eye-slash.png" : "icons/eye.png";
+    });
+
+    document.getElementById("switchMode").addEventListener("click", () => {
+      isRegisterMode = !isRegisterMode;
+      document.getElementById("title").innerText = isRegisterMode ? "РЕГИСТРАЦИЯ" : "ВХОД";
+      document.getElementById("confirmContainer").style.display = isRegisterMode ? "block" : "none";
+      document.getElementById("switchMode").innerText = isRegisterMode ? "Войдите" : "Создать аккаунт";
+    });
+
+    function handleAction() {
+      const name = document.getElementById("name").value.trim();
+      const pass = password.value.trim();
+      const confirmPass = confirm.value.trim();
+
+      if (!name || !pass) {
+        alert("Введите имя и пароль");
+        return;
+      }
+
+      let users = JSON.parse(localStorage.getItem("users") || "{}");
+
+      if (isRegisterMode) {
+        if (pass !== confirmPass) {
+          alert("Пароли не совпадают!");
+          return;
+        }
+        if (users[name]) {
+          alert("Такой пользователь уже существует");
+          return;
+        }
+        users[name] = pass;
+        localStorage.setItem("users", JSON.stringify(users));
+
+        // ✅ Сохраняем ник в storage
+        Storage.setNickname(name);
+
+        alert("Регистрация успешна!");
+        window.location.href = "index.html";
+      } else {
+        if (!users[name] || users[name] !== pass) {
+          alert("Неверное имя или пароль");
+          return;
+        }
+
+        // ✅ Сохраняем ник при входе
+        Storage.setNickname(name);
+
+        alert("Вход выполнен!");
+        window.location.href = "index.html";
+      }
+    }
+  </script>
+</body>
+</html>
