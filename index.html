@@ -93,7 +93,7 @@
       <input type="password" placeholder="confirm password..." id="confirm" />
       <img src="icons/eye-slash.png" id="toggleConfirm">
     </div>
-    <button onclick="handleAction()">Готово </button>
+    <button onclick="handleAction()">Готово</button>
     <p style="margin-top: 10px; color:white;">
       Уже есть аккаунт? <a href="#" id="switchMode">Войдите</a>
     </p>
@@ -101,8 +101,15 @@
 
   <script src="storage.js"></script>
   <script>
+    // ✅ Проверяем — если пользователь уже вошёл, сразу на main.html
+    const savedUser = localStorage.getItem("nickname");
+    if (savedUser) {
+      window.location.href = "main.html";
+    }
+
     let isRegisterMode = true;
 
+    // Переключение видимости паролей
     const togglePassword = document.getElementById("togglePassword");
     const password = document.getElementById("password");
     togglePassword.addEventListener("click", () => {
@@ -119,6 +126,7 @@
       toggleConfirm.src = type === "password" ? "icons/eye-slash.png" : "icons/eye.png";
     });
 
+    // Переключение между регистрацией и входом
     document.getElementById("switchMode").addEventListener("click", () => {
       isRegisterMode = !isRegisterMode;
       document.getElementById("title").innerText = isRegisterMode ? "РЕГИСТРАЦИЯ" : "ВХОД";
@@ -126,6 +134,7 @@
       document.getElementById("switchMode").innerText = isRegisterMode ? "Войдите" : "Создать аккаунт";
     });
 
+    // Основная функция входа/регистрации
     function handleAction() {
       const name = document.getElementById("name").value.trim();
       const pass = password.value.trim();
@@ -147,25 +156,27 @@
           alert("Такой пользователь уже существует");
           return;
         }
+
+        // Сохраняем пользователя
         users[name] = pass;
         localStorage.setItem("users", JSON.stringify(users));
 
-        // ✅ Сохраняем ник в storage
-        Storage.setNickname(name);
+        // Сохраняем ник как текущего пользователя
+        localStorage.setItem("nickname", name);
 
         alert("Регистрация успешна!");
-        window.location.href = "index.html";
+        window.location.href = "main.html";
       } else {
         if (!users[name] || users[name] !== pass) {
           alert("Неверное имя или пароль");
           return;
         }
 
-        // ✅ Сохраняем ник при входе
-        Storage.setNickname(name);
+        // Сохраняем ник как вошедшего
+        localStorage.setItem("nickname", name);
 
         alert("Вход выполнен!");
-        window.location.href = "index.html";
+        window.location.href = "main.html";
       }
     }
   </script>
