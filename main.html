@@ -1,90 +1,89 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Комнаты</title>
-<link rel="stylesheet" href="style.css">
-
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
 <script>
-  // 🔥 ТВОИ ДАННЫЕ FIREBASE (замени своими)
-  const firebaseConfig = {
-    apiKey: "ТВОЙ_API_KEY",
-    authDomain: "ТВОЙ_ПРОЕКТ.firebaseapp.com",
-    databaseURL: "https://ТВОЙ_ПРОЕКТ-default-rtdb.firebaseio.com",
-    projectId: "ТВОЙ_ПРОЕКТ",
-    storageBucket: "ТВОЙ_ПРОЕКТ.appspot.com",
-    messagingSenderId: "XXX",
-    appId: "1:XXX:web:XXX"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-</script>
-</head>
-<body>
-  <div class="container">
-    <div class="room-list" id="roomList"></div>
-    <video id="player" controls style="display:none;width:100%;margin-top:10px;background:#000;"></video>
-    <button class="add-btn" id="addRoom">+</button>
-  </div>
+// Загружаем ник
+const nicknameEl = document.getElementById("nickname");
+nicknameEl.textContent = Storage.getNickname() || "username";
 
-  <div id="sidePanel" class="side-panel">
-    <div class="avatar"></div>
-    <div class="nickname" id="nickname">username</div>
-  </div>
-
-  <button id="arrowBtn" class="arrow-btn">❯</button>
-
-<script src="storage.js"></script>
-<script>
-// Инициализация элементов
 const roomList = document.getElementById("roomList");
 const addRoom = document.getElementById("addRoom");
 const player = document.getElementById("player");
 const sidePanel = document.getElementById("sidePanel");
 const arrowBtn = document.getElementById("arrowBtn");
-const nicknameEl = document.getElementById("nickname");
 
-// Никнейм
-nicknameEl.textContent = Storage.getNickname() || "username";
+// 🟢 Хранилище комнат на общем JSON (например, GitHub Pages или другой URL)
+const ROOMS_URL = "https://api.jsonbin.io/v3/b/your-bin-id"; // сюда подставь свой ID с jsonbin.io
+const API_KEY = "YOUR_API_KEY"; // получаешь при регистрации (бесплатно)
 
-// 🔄 Рендер комнат из Firebase
-function renderRooms(rooms) {
+// Получаем комнаты с сервера
+async function fetchRooms() {
+  try {
+    const res = await fetch(ROOMS_URL + "/latest", {
+      headers: { "X-Master-Key": API_KEY }
+    });
+    const data = await res.json();
+    return data.record.rooms || [];
+  } catch (err) {
+    console.error("Ошибка загрузки комнат:", err);
+    return Storage.getRooms(); // fallback на localStorage
+  }
+}
+
+// Сохраняем комнаты на сервере
+async function saveRooms(rooms) {
+  try {
+    await fetch(ROOMS_URL, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Master-Key": API_KEY
+      },
+      body: JSON.stringify({ rooms })
+    });
+  } catch (err) {
+    console.error("Ошибка сохранения:", err);
+  }
+}
+
+// Очистка старых комнат каждые 2 сек
+setInterval(async () => {
+  const rooms = await fetchRooms();
+  if (rooms.length > 0) {
+    const now = Date.now();
+    const updated = rooms.filter(r => !(now - r.created > 300000 && !r.visited));
+    if (updated.length !== rooms.length) {
+      await saveRooms(updated);
+      Storage.saveRooms(updated);
+      renderRooms(updated);
+    }
+  }
+}, 2000);
+
+// Рендер
+async function renderRooms(forcedRooms) {
+  const rooms = forcedRooms || await fetchRooms();
   roomList.innerHTML = "";
-  if (!rooms || Object.keys(rooms).length === 0) {
+  if (rooms.length === 0) {
     roomList.innerHTML = "<p style='color:#999;text-align:center;margin-top:40%;'>Нет активных комнат</p>";
     return;
   }
 
-  Object.values(rooms).forEach(room => {
+  rooms.forEach((room) => {
     const div = document.createElement("div");
     div.className = "room-item";
     div.innerHTML = `<div class="room-circle"></div><span>${room.name}</span>`;
     div.onclick = () => {
       Storage.setCurrentRoom(room.name);
-      db.ref("rooms/" + room.name).update({ visited: true });
+      room.visited = true;
+      Storage.updateRoom(room);
       window.location.href = `room.html?room=${encodeURIComponent(room.name)}`;
     };
     roomList.appendChild(div);
   });
 }
 
-// 🔥 Подписка на изменения в Firebase
-db.ref("rooms").on("value", snapshot => {
-  renderRooms(snapshot.val());
-});
-
-// ➕ Добавление комнаты
-addRoom.onclick = () => {
+// Добавление комнаты
+addRoom.onclick = async () => {
   const newRoom = prompt("Введите название комнаты:");
   if (!newRoom) return;
-
-  const roomData = { name: newRoom.trim(), created: Date.now(), visited: false };
-  db.ref("rooms/" + roomData.name).set(roomData);
 
   // выбор видео
   const fileInput = document.createElement('input');
@@ -100,20 +99,30 @@ addRoom.onclick = () => {
   };
   fileInput.click();
 
-  // автоудаление через 5 минут неактивности
+  // новая комната
+  const roomData = { name: newRoom.trim(), created: Date.now(), visited: false };
+  const rooms = await fetchRooms();
+  rooms.push(roomData);
+  await saveRooms(rooms);
+  Storage.saveRooms(rooms);
+  renderRooms(rooms);
+
+  // автоудаление неактивной комнаты
   setTimeout(async () => {
-    const snap = await db.ref("rooms/" + roomData.name).once("value");
-    const room = snap.val();
-    if (room && !room.visited && Date.now() - room.created > 300000) {
-      db.ref("rooms/" + roomData.name).remove();
-      console.log("Комната удалена:", roomData.name);
-    }
-  }, 300000);
+    const all = await fetchRooms();
+    const updated = all.filter(r => !(r.name === roomData.name && !r.visited));
+    await saveRooms(updated);
+    Storage.saveRooms(updated);
+    renderRooms(updated);
+  }, 5000);
 
   window.location.href = `room.html?room=${encodeURIComponent(newRoom)}`;
 };
 
-// 🔄 Панель пользователя
+// Первоначальный рендер
+renderRooms();
+
+// Панель
 let isOpen = false;
 arrowBtn.onclick = () => {
   isOpen = !isOpen;
@@ -128,6 +137,3 @@ arrowBtn.onclick = () => {
   }
 };
 </script>
-</body>
-</html>
-
