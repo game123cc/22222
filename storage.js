@@ -1,33 +1,52 @@
 // storage.js
+
+// 🔥 Подключение Firebase
+const firebaseConfig = {
+  apiKey: "ТВОЙ_API_KEY",
+  authDomain: "ТВОЙ_ПРОЕКТ.firebaseapp.com",
+  databaseURL: "https://ТВОЙ_ПРОЕКТ.firebaseio.com",
+  projectId: "ТВОЙ_ПРОЕКТ",
+  storageBucket: "ТВОЙ_ПРОЕКТ.appspot.com",
+  messagingSenderId: "XXX",
+  appId: "1:XXX:web:XXX"
+};
+
+if (!window.firebaseApp) {
+  firebase.initializeApp(firebaseConfig);
+  window.firebaseApp = true;
+}
+const db = firebase.database();
+
+// --- Работа с комнатами ---
 const Storage = {
-  // --- Работа с комнатами ---
-  getRooms() {
-    const raw = localStorage.getItem("rooms");
-    return raw ? JSON.parse(raw) : [];
+  async getRooms() {
+    const snapshot = await db.ref("rooms").once("value");
+    const data = snapshot.val();
+    return data ? Object.values(data) : [];
   },
 
-  saveRooms(rooms) {
-    localStorage.setItem("rooms", JSON.stringify(rooms));
+  async saveRooms(rooms) {
+    const updates = {};
+    rooms.forEach(r => updates[r.name] = r);
+    await db.ref("rooms").set(updates);
   },
 
-  updateRoom(room) {
-    const rooms = this.getRooms();
-    const index = rooms.findIndex(r => r.name === room.name);
-    if (index !== -1) {
-      rooms[index] = room;
-      this.saveRooms(rooms);
-    }
+  async addRoom(room) {
+    await db.ref("rooms/" + room.name).set(room);
   },
 
-  clearRooms() {
-    localStorage.removeItem("rooms");
-    localStorage.removeItem("currentRoom");
+  async updateRoom(room) {
+    await db.ref("rooms/" + room.name).update(room);
   },
 
+  async clearRooms() {
+    await db.ref("rooms").remove();
+  },
+
+  // --- Текущее состояние ---
   getCurrentRoom() {
     return localStorage.getItem("currentRoom");
   },
-
   setCurrentRoom(name) {
     localStorage.setItem("currentRoom", name);
   },
@@ -36,11 +55,9 @@ const Storage = {
   setNickname(nickname) {
     localStorage.setItem("nickname", nickname);
   },
-
   getNickname() {
     return localStorage.getItem("nickname") || "username";
   },
-
   clearNickname() {
     localStorage.removeItem("nickname");
   }
